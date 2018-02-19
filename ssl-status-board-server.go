@@ -20,7 +20,7 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     func(*http.Request) bool { return true },
 }
 
-var config Config
+var serverConfig ServerConfig
 
 func echoHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -64,15 +64,15 @@ func sendDataToWebSocket(conn *websocket.Conn) {
 			return
 		}
 
-		time.Sleep(config.SendingInterval)
+		time.Sleep(serverConfig.SendingInterval)
 	}
 }
 
 func broadcastToProxy() error {
-	u := url.URL{Scheme: config.ServerProxy.Scheme, Host: config.ServerProxy.Address, Path: config.ServerProxy.Path}
+	u := url.URL{Scheme: serverConfig.ServerProxy.Scheme, Host: serverConfig.ServerProxy.Address, Path: serverConfig.ServerProxy.Path}
 	log.Printf("connecting to %s", u.String())
 
-	auth := []byte(config.ServerProxy.User + ":" + config.ServerProxy.Password)
+	auth := []byte(serverConfig.ServerProxy.User + ":" + serverConfig.ServerProxy.Password)
 	authBase64 := base64.StdEncoding.EncodeToString(auth)
 
 	requestHeader := http.Header{}
@@ -92,26 +92,26 @@ func handleServerProxy() {
 		err := broadcastToProxy()
 		log.Println("Disconnected from proxy ", err)
 		if err != nil {
-			time.Sleep(config.ServerProxy.ReconnectInterval)
+			time.Sleep(serverConfig.ServerProxy.ReconnectInterval)
 		}
 	}
 }
 
 func main() {
 
-	configFile := flag.String("config", "config.yaml", "The config file to use")
+	configFile := flag.String("c", "server-config.yaml", "The config file to use")
 	flag.Parse()
 
-	config = ReadConfig(*configFile);
-	log.Println(config)
+	serverConfig = ReadServerConfig(*configFile);
+	log.Println("Server config:", serverConfig)
 
 	go handleIncomingRefereeMessages()
 
-	if config.ServerProxy.Enabled {
+	if serverConfig.ServerProxy.Enabled {
 		go handleServerProxy()
 	}
 
 	http.HandleFunc("/echo", echoHandler)
 	http.HandleFunc("/ssl-status", statusHandler)
-	log.Fatal(http.ListenAndServe(config.ListenAddress, nil))
+	log.Fatal(http.ListenAndServe(serverConfig.ListenAddress, nil))
 }

@@ -4,8 +4,6 @@ import (
 	"github.com/gorilla/websocket"
 	"net/http"
 	"log"
-	"os"
-	"bufio"
 	"flag"
 )
 
@@ -24,6 +22,7 @@ var statusChannel = make(chan WsMessage, 100)
 var clientConnections []*websocket.Conn
 var statusProviderConnected = false
 var credentials []string
+var proxyConfig ProxyConfig
 
 func receiveStatusHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -37,7 +36,7 @@ func receiveStatusHandler(w http.ResponseWriter, r *http.Request) {
 	if !validCredentials(user, password) {
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write([]byte("Your credentials are invalid."))
-		log.Println("Status provider tried to connect with wrong credentials: ", user, password)
+		log.Println("Status provider tried to connect with wrong credentials:", user, password)
 		return
 	}
 
@@ -118,32 +117,25 @@ func serveStatusHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Client connected, now %d clients.\n", len(clientConnections))
 }
 
-func loadCredentials(authFile string) {
-	file, err := os.Open(authFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		credentials = append(credentials, scanner.Text())
-	}
-	if err := scanner.Err(); err != nil {
-		log.Fatal(err)
+func loadCredentials() {
+	for _, a := range proxyConfig.AuthCredentials {
+		credentials = append(credentials, a.Username+":"+a.Password)
 	}
 }
 
 func main() {
 
-	listenAddress := flag.String("a", ":4202", "The listen address ( [network]:port )")
-	authFile := flag.String("f", "auth.conf", "A file containing valid basic auth credentials, one per line")
+	configFile := flag.String("c", "proxy-config.yaml", "The config file to use")
 	flag.Parse()
 
-	loadCredentials(*authFile)
+	proxyConfig = ReadProxyConfig(*configFile)
+	log.Println("Proxy config:", proxyConfig)
+
+	loadCredentials()
 
 	go sendStatus()
-	http.HandleFunc("/ssl-status", serveStatusHandler)
-	http.HandleFunc("/ssl-status-receive", receiveStatusHandler)
-	log.Println("Start listener on", *listenAddress)
-	log.Fatal(http.ListenAndServe(*listenAddress, nil))
+	http.HandleFunc(proxyConfig.ServePath, serveStatusHandler)
+	http.HandleFunc(proxyConfig.ReceivePath, receiveStatusHandler)
+	log.Println("Start listener on", proxyConfig.ListenAddress)
+	log.Fatal(http.ListenAndServe(proxyConfig.ListenAddress, nil))
 }

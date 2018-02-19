@@ -8,7 +8,7 @@ import (
 )
 
 func handleIncomingRefereeMessages() {
-	refereeAddr := config.RefereeAddress
+	refereeAddr := serverConfig.RefereeAddress
 	err, refereeListener := openRefereeConnection(refereeAddr)
 	if err != nil {
 		log.Println("Could not connect to ", refereeAddr)

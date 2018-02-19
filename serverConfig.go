@@ -18,15 +18,15 @@ type ServerProxyConfig struct {
 	ReconnectInterval time.Duration `yaml:"ReconnectInterval"`
 }
 
-type Config struct {
+type ServerConfig struct {
 	ServerProxy     ServerProxyConfig `yaml:"ServerProxy"`
 	ListenAddress   string            `yaml:"ListenAddress"`
 	RefereeAddress  string            `yaml:"RefereeAddress"`
 	SendingInterval time.Duration     `yaml:"SendingInterval"`
 }
 
-func ReadConfig(fileName string) Config {
-	config := Config{}
+func ReadServerConfig(fileName string) ServerConfig {
+	config := ServerConfig{}
 	f, err := os.Open(fileName)
 	if err != nil {
 		log.Fatal(err)

@@ -1,0 +1,6 @@
+ListenAddress: ":4202"
+ServePath: "/ssl-status"
+ReceivePath: "/ssl-status-receive"
+AuthCredentials:
+ - Username: "default"
+   Password: "default"

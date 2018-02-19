@@ -5,7 +5,7 @@ ServerProxy:
   Enabled: true
   Scheme: "ws"
   Address: "localhost:4202"
-  Path: "/ssl-status-receive"
+  Path: "/ssl-status/publish"
   User: "default"
   Password: "default"
   ReconnectInterval: "30s"

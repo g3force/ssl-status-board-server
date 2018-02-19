@@ -14,8 +14,8 @@ type AuthCredential struct {
 
 type ProxyConfig struct {
 	ListenAddress   string           `yaml:"ListenAddress"`
-	ServePath       string           `yaml:"ServePath"`
-	ReceivePath     string           `yaml:"ReceivePath"`
+	SubscribePath   string           `yaml:"SubscribePath"`
+	PublishPath     string           `yaml:"PublishPath"`
 	AuthCredentials []AuthCredential `yaml:"AuthCredentials"`
 }
 

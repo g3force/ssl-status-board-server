@@ -134,8 +134,8 @@ func main() {
 	loadCredentials()
 
 	go sendStatus()
-	http.HandleFunc(proxyConfig.ServePath, serveStatusHandler)
-	http.HandleFunc(proxyConfig.ReceivePath, receiveStatusHandler)
+	http.HandleFunc(proxyConfig.SubscribePath, serveStatusHandler)
+	http.HandleFunc(proxyConfig.PublishPath, receiveStatusHandler)
 	log.Println("Start listener on", proxyConfig.ListenAddress)
 	log.Fatal(http.ListenAndServe(proxyConfig.ListenAddress, nil))
 }

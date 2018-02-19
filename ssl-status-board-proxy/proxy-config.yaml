@@ -1,6 +1,6 @@
 ListenAddress: ":4202"
-ServePath: "/ssl-status"
-ReceivePath: "/ssl-status-receive"
+SubscribePath: "/ssl-status/subscribe"
+PublishPath: "/ssl-status/publish"
 AuthCredentials:
  - Username: "default"
    Password: "default"

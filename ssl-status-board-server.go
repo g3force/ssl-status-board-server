@@ -7,65 +7,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-	"github.com/RoboCup-SSL/ssl-go-tools/sslproto"
-	"net"
-	"github.com/golang/protobuf/proto"
+	"net/url"
+	"encoding/base64"
+	"flag"
 )
 
 const maxDatagramSize = 8192
 
-type Team struct {
-	Name            string
-	Goals           int
-	RedCards        int
-	YellowCards     int
-	YellowCardTimes []uint32
-	Timeouts        int
-	TimeoutTime     int
-}
-
-type Stage struct {
-	Name     string
-	TimeLeft int
-}
-
-type Command struct {
-	Name string
-}
-
-type Originator struct {
-	Team  string
-	BotId int
-}
-
-type GameEvent struct {
-	Type       string
-	Originator Originator
-	Message    string
-}
-
-type Referee struct {
-	Stage      Stage
-	Command    Command
-	TeamYellow Team
-	TeamBlue   Team
-	GameEvent  GameEvent
-}
-
-var referee = Referee{Stage{"NORMAL_FIRST_HALF_PRE", 1000}, Command{"HALT"},
-	Team{"yellow", 5, 0, 1, []uint32{5000}, 1, 10000},
-	Team{"blue", 1, 1, 3, []uint32{}, 2, 20000},
-	GameEvent{"UNKNOWN", Originator{"UNKNOWN", -1}, "Custom message"}}
-
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	CheckOrigin:     checkOrigin,
+	CheckOrigin:     func(*http.Request) bool { return true },
 }
 
-func checkOrigin(r *http.Request) bool {
-	return true
-}
+var config Config
 
 func echoHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -87,116 +42,76 @@ func echoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func refereeHandler(w http.ResponseWriter, r *http.Request) {
+func statusHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
+	defer conn.Close()
 
+	sendDataToWebSocket(conn)
+}
+
+func sendDataToWebSocket(conn *websocket.Conn) {
 	for {
 		b, err := json.Marshal(referee)
 		if err != nil {
-			fmt.Println("error:", err)
+			fmt.Println("Marshal error:", err)
 		}
 		if err := conn.WriteMessage(websocket.TextMessage, b); err != nil {
 			log.Println(err)
 			return
 		}
 
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(config.SendingInterval)
 	}
 }
 
-func handleIncomingRefereeMessages() {
-	refereeAddr := "224.5.23.1:10003"
-	err, refereeListener := openRefereeConnection(refereeAddr)
-	if err != nil {
-		log.Println("Could not connect to ", refereeAddr)
-	}
+func broadcastToProxy() error {
+	u := url.URL{Scheme: config.ServerProxy.Scheme, Host: config.ServerProxy.Address, Path: config.ServerProxy.Path}
+	log.Printf("connecting to %s", u.String())
 
-	lastCommandId := uint32(100000000)
+	auth := []byte(config.ServerProxy.User + ":" + config.ServerProxy.Password)
+	authBase64 := base64.StdEncoding.EncodeToString(auth)
+
+	requestHeader := http.Header{}
+	requestHeader.Set("Authorization", "Basic "+authBase64)
+	conn, _, err := websocket.DefaultDialer.Dial(u.String(), requestHeader)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	sendDataToWebSocket(conn)
+	return nil
+}
+
+func handleServerProxy() {
 	for {
-		data := make([]byte, maxDatagramSize)
-		n, _, err := refereeListener.ReadFromUDP(data)
+		err := broadcastToProxy()
+		log.Println("Disconnected from proxy ", err)
 		if err != nil {
-			log.Fatal("ReadFromUDP failed:", err)
-		}
-
-		message, err := parseRefereeMessage(data[:n])
-		if err != nil {
-			log.Print("Could not parse referee message: ", err)
-		} else {
-			saveRefereeMessageFields(message)
-
-			if *message.CommandCounter != lastCommandId {
-				log.Println("Received referee message:", message)
-				lastCommandId = *message.CommandCounter
-			}
+			time.Sleep(config.ServerProxy.ReconnectInterval)
 		}
 	}
-}
-
-func saveRefereeMessageFields(message *sslproto.SSL_Referee) {
-	referee.Stage.Name = message.Stage.String()
-	if message.StageTimeLeft != nil {
-		referee.Stage.TimeLeft = int(*message.StageTimeLeft)
-	} else {
-		referee.Stage.TimeLeft = 0
-	}
-	referee.Command.Name = message.Command.String()
-	referee.TeamYellow = mapTeam(message.Yellow)
-	referee.TeamBlue = mapTeam(message.Blue)
-	referee.GameEvent.Originator.Team = message.GameEvent.Originator.Team.String()
-	if message.GameEvent != nil {
-		if message.GameEvent.Originator.BotId == nil {
-			referee.GameEvent.Originator.BotId = -1
-		} else {
-			referee.GameEvent.Originator.BotId = int(*message.GameEvent.Originator.BotId)
-		}
-		if message.GameEvent.Message == nil {
-			referee.GameEvent.Message = ""
-		} else {
-			referee.GameEvent.Message = *message.GameEvent.Message
-		}
-		referee.GameEvent.Type = message.GameEvent.GameEventType.String()
-	}
-}
-
-func mapTeam(teamInfo *sslproto.SSL_Referee_TeamInfo) (team Team) {
-	team.Name = *teamInfo.Name
-	team.Goals = int(*teamInfo.Score)
-	team.YellowCards = int(*teamInfo.YellowCards)
-	team.RedCards = int(*teamInfo.RedCards)
-	team.YellowCardTimes = teamInfo.YellowCardTimes
-	team.Timeouts = int(*teamInfo.Timeouts)
-	team.TimeoutTime = int(*teamInfo.TimeoutTime)
-	return
-}
-
-func openRefereeConnection(refereeAddr string) (err error, refereeListener *net.UDPConn) {
-	addr, err := net.ResolveUDPAddr("udp", refereeAddr)
-	if err != nil {
-		log.Fatal(err)
-	}
-	refereeListener, err = net.ListenMulticastUDP("udp", nil, addr)
-	if err != nil {
-		log.Fatal("could not connect to ", refereeAddr)
-	}
-	refereeListener.SetReadBuffer(maxDatagramSize)
-	log.Printf("Listening on %s", refereeAddr)
-	return
-}
-
-func parseRefereeMessage(data []byte) (message *sslproto.SSL_Referee, err error) {
-	message = new(sslproto.SSL_Referee)
-	err = proto.Unmarshal(data, message)
-	return
 }
 
 func main() {
+
+	configFile := flag.String("config", "config.yaml", "The config file to use")
+	flag.Parse()
+
+	config = ReadConfig(*configFile);
+	log.Println(config)
+
 	go handleIncomingRefereeMessages()
+
+	if config.ServerProxy.Enabled {
+		go handleServerProxy()
+	}
+
 	http.HandleFunc("/echo", echoHandler)
-	http.HandleFunc("/referee", refereeHandler)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	http.HandleFunc("/ssl-status", statusHandler)
+	log.Fatal(http.ListenAndServe(config.ListenAddress, nil))
 }

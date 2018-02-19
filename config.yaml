@@ -1,0 +1,11 @@
+ListenAddress: ":4201"
+RefereeAddress: "224.5.23.1:10003"
+SendingInterval: "100ms"
+ServerProxy:
+  Enabled: true
+  Scheme: "ws"
+  Address: "localhost:4202"
+  Path: "/ssl-status-receive"
+  User: "default"
+  Password: "default"
+  ReconnectInterval: "30s"

@@ -112,6 +112,6 @@ func main() {
 	}
 
 	http.HandleFunc("/echo", echoHandler)
-	http.HandleFunc("/ssl-status", statusHandler)
+	http.HandleFunc(serverConfig.SubscribePath, statusHandler)
 	log.Fatal(http.ListenAndServe(serverConfig.ListenAddress, nil))
 }

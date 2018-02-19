@@ -21,6 +21,7 @@ type ServerProxyConfig struct {
 type ServerConfig struct {
 	ServerProxy     ServerProxyConfig `yaml:"ServerProxy"`
 	ListenAddress   string            `yaml:"ListenAddress"`
+	SubscribePath   string            `yaml:"SubscribePath"`
 	RefereeAddress  string            `yaml:"RefereeAddress"`
 	SendingInterval time.Duration     `yaml:"SendingInterval"`
 }

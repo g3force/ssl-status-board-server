@@ -49,6 +49,9 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close()
+	defer log.Println("Client disconnected")
+
+	log.Println("Client connected")
 
 	sendDataToWebSocket(conn)
 }

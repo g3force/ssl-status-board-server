@@ -1,0 +1,15 @@
+language: go
+os: linux
+
+before_install:
+  - sudo apt-get update -qq
+  - sudo apt-get install git golang
+
+matrix:
+  include:
+    - sudo: required
+      dist: trusty
+
+script: 
+ - go get -u github.com/g3force/ssl-status-board-server
+ - go get -u github.com/g3force/ssl-status-board-server/ssl-status-board-proxy

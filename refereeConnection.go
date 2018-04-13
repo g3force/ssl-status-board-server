@@ -47,11 +47,16 @@ func saveRefereeMessageFields(message *sslproto.SSL_Referee) {
 	referee.TeamYellow = mapTeam(message.Yellow)
 	referee.TeamBlue = mapTeam(message.Blue)
 	if message.GameEvent != nil {
-		referee.GameEvent.Originator.Team = message.GameEvent.Originator.Team.String()
-		if message.GameEvent.Originator.BotId == nil {
-			referee.GameEvent.Originator.BotId = -1
+		if message.GameEvent.Originator != nil {
+			referee.GameEvent.Originator.Team = message.GameEvent.Originator.Team.String()
+			if message.GameEvent.Originator.BotId == nil {
+				referee.GameEvent.Originator.BotId = -1
+			} else {
+				referee.GameEvent.Originator.BotId = int(*message.GameEvent.Originator.BotId)
+			}
 		} else {
-			referee.GameEvent.Originator.BotId = int(*message.GameEvent.Originator.BotId)
+			referee.GameEvent.Originator.Team = "TEAM_UNKNOWN"
+			referee.GameEvent.Originator.BotId = -1
 		}
 		if message.GameEvent.Message == nil {
 			referee.GameEvent.Message = ""
